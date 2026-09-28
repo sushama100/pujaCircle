@@ -9,6 +9,7 @@ import { PincodeLookupResponse } from '@/types/address.types';
 import { apiClient } from './client';
 import { useAuthStore } from '@/store/auth.store';
 import { logAppError, getUserFriendlyErrorMessage } from '@/lib/errorHandler';
+import { getPriestExceptions, calculateDayMuhuratSlots } from '@/lib/availabilityUtils';
 
 export const priestApi = {
   // Helper to resolve current authenticated priest ID
@@ -154,10 +155,17 @@ export const priestApi = {
   getAvailableSlotsForDate: async (priestId: string, date: string): Promise<PriestSlot[]> => {
     try {
       const res = await apiClient.get(`/priests/${priestId}/slots/available`, { params: { date } });
-      return (res as any).data || res;
+      const slots = (res as any).data || res;
+      if (Array.isArray(slots) && slots.length > 0) {
+        return slots;
+      }
+      // Dynamic fallback for exception-based 7 AM - 9 PM rolling calendar
+      const exceptions = getPriestExceptions(priestId);
+      return calculateDayMuhuratSlots(priestId, date, exceptions) as any[];
     } catch (error) {
       logAppError('priestApi.getAvailableSlotsForDate', error, { priestId, date });
-      return [];
+      const exceptions = getPriestExceptions(priestId);
+      return calculateDayMuhuratSlots(priestId, date, exceptions) as any[];
     }
   },
 
